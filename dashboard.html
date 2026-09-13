@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Agent Dashboard — VipBooks1</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;max-width:1100px;margin:12px auto;padding:10px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:8px;border:1px solid #ddd;text-align:left;font-size:14px}
+    th{background:#f7f7f7}
+    .not-started{background:#fff}
+    .in-progress{background:#fff8e6}
+    .done{background:#e9ffef}
+    .controls{display:flex;gap:8px;align-items:center}
+    .btn{padding:8px 12px;background:#0b74de;color:#fff;border-radius:6px;text-decoration:none;cursor:pointer;border:none}
+    .small{padding:6px 8px;font-size:13px}
+    .link{color:#0b74de}
+  </style>
+</head>
+<body>
+  <h1>Agent Dashboard — VipBooks1</h1>
+  <p>Live agent data comes from a published Google Sheet CSV. The Start All button toggles agents to “in-progress” in your browser — to persist changes update the sheet (link shown below).</p>
+  <div class="controls">
+    <button id="startAll" class="btn">Start All (local)</button>
+    <button id="resetAll" class="btn small" style="background:#777">Reset (local)</button>
+    <a id="openSheet" class="link" href="#" target="_blank">Open Google Sheet (edit)</a>
+    <span style="margin-left:auto">Last refresh: <span id="lastRefresh">—</span></span>
+  </div>
+
+  <table id="agentsTable" aria-live="polite">
+    <thead><tr><th>Agent ID</th><th>Platform</th><th>Status</th><th>Notes</th><th>Links</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+<script>
+const CSV_URL = "CSV_URL"; // REPLACE with your published Google Sheet CSV URL (CSV format)
+const openSheetLink = document.getElementById('openSheet');
+function fetchCSV(){
+  fetch(CSV_URL)
+    .then(r => r.text())
+    .then(text => {
+      document.getElementById('lastRefresh').textContent = new Date().toLocaleString();
+      const rows = text.trim().split('\n').map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
+      const header = rows.shift().map(h => h.replace(/(^\"|\"$)/g,''));
+      const tbody = document.querySelector("#agentsTable tbody");
+      tbody.innerHTML = '';
+      rows.forEach(c => {
+        const [agent_id,agent_name,platform,contact,status,notes,...links] = c;
+        const tr = document.createElement('tr');
+        const statusClass = (status||'').toLowerCase().replace(/\s+/g,'-') || 'not-started';
+        const linksHtml = links.filter(Boolean).map(l => `<a href="${l.replace(/(^\"|\"$)/g,'')}" target="_blank">link</a>`).join(' ');
+        tr.innerHTML = `<td>${agent_id||''}</td><td>${platform||''}</td><td class="${statusClass}">${status||'not-started'}</td><td>${notes||''}</td><td>${linksHtml}</td>`;
+        tbody.appendChild(tr);
+      });
+      // set openSheet link to the CSV origin (sheet owner will replace)
+      openSheetLink.href = CSV_URL.replace(/\\/gviz\\/.*|&output=csv/,'');
+    })
+    .catch(e => {
+      const tbody = document.querySelector("#agentsTable tbody");
+      tbody.innerHTML = '<tr><td colspan="5" style="color:red">Error loading CSV — replace CSV_URL with your published Google Sheet CSV link.</td></tr>';
+      console.error(e);
+    });
+}
+fetchCSV();
+setInterval(fetchCSV, 30*1000); // refresh every 30s
+
+// Simple client-side Start All (local only)
+document.getElementById('startAll').addEventListener('click', () => {
+  document.querySelectorAll('#agentsTable tbody tr').forEach(tr => {
+    tr.cells[2].textContent = 'in-progress';
+    tr.cells[2].className = 'in-progress';
+  });
+});
+document.getElementById('resetAll').addEventListener('click', () => {
+  document.querySelectorAll('#agentsTable tbody tr').forEach(tr => {
+    tr.cells[2].textContent = 'not-started';
+    tr.cells[2].className = 'not-started';
+  });
+});
+</script>
+</body>
+</html>
