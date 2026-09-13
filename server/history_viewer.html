@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Agent Run History</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body{font-family:system-ui,Arial;margin:18px;background:#f6f7fb}
+    table{width:100%;border-collapse:collapse;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,0.06)}
+    th,td{padding:8px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}
+    pre{white-space:pre-wrap;max-height:160px;overflow:auto}
+    .summary{margin-bottom:12px}
+  </style>
+</head>
+<body>
+  <h2>Agent Run History</h2>
+  <p>Shows recent agent runs (timestamp, status, input snippet, output snippet).</p>
+  <div class="summary" id="summary">Loading summary…</div>
+  <div id="content">Loading…</div>
+  <script>
+    async function load() {
+      try {
+        const r = await fetch('/history');
+        const arr = await r.json();
+        if (!arr || !arr.length) {
+          document.getElementById('content').innerHTML = '<p>No runs yet.</p>';
+          document.getElementById('summary').innerText = '';
+          return;
+        }
+        const rows = arr.slice(-200).reverse(); // show newest first
+        // build summary
+        const total = arr.length;
+        const successes = arr.filter(x=>x.status==='success').length;
+        const errors = arr.filter(x=>x.status==='error').length;
+        const avg = Math.round((arr.filter(x=>x.duration_ms).reduce((s,v)=>s+(v.duration_ms||0),0) / Math.max(1,arr.filter(x=>x.duration_ms).length)));
+        document.getElementById('summary').innerHTML = `Total runs: ${total} — Success: ${successes} — Errors: ${errors} — Avg duration(ms): ${isNaN(avg)?'N/A':avg}`;
+
+        let html = '<table><thead><tr><th>Time</th><th>Status</th><th>Input (snippet)</th><th>Output (snippet)</th><th>Duration ms</th></tr></thead><tbody>';
+        for (const e of rows) {
+          html += '<tr>';
+          html += '<td>' + (e.timestamp || '') + '</td>';
+          html += '<td>' + (e.status || '') + '</td>';
+          html += '<td><pre>' + (e.input ? JSON.stringify(e.input).slice(0,300) : '') + '</pre></td>';
+          html += '<td><pre>' + (e.parsed_output ? JSON.stringify(e.parsed_output).slice(0,600) : (e.response_raw ? (''+e.response_raw).slice(0,600) : '')) + '</pre></td>';
+          html += '<td>' + ((e.duration_ms) || '') + '</td>';
+          html += '</tr>';
+        }
+        html += '</tbody></table>';
+        document.getElementById('content').innerHTML = html;
+      } catch (err) {
+        document.getElementById('content').innerText = 'Error loading history: ' + err;
+      }
+    }
+    load();
+    setInterval(load, 5000);
+  </script>
+</body>
+</html>
